@@ -1,90 +1,223 @@
-import '!prismjs/themes/prism.css';
-import {
-  Button,
-  Container,
-  render,
-  VerticalSpace,
-} from '@create-figma-plugin/ui';
-import { h } from 'preact';
-import { useState, useEffect } from 'preact/hooks';
+import '!react-notion-x/src/styles.css';
+import '!prismjs/themes/prism.css'; // 코드 블록 스타일
+import '!katex/dist/katex.min.css'; // 수식 스타일
+import ReactDOM from 'react-dom/client'; // React 18용
+import React, { useState, useEffect } from 'react';
 import { NotionRenderer } from 'react-notion-x';
+import '!./styles.css';
+import useWindowResize from './useWindowResize';
 
-import styles from './styles.css';
+const PROXY_URL = 'https://spec-sync-api.vercel.app/api/notion'; // ✅ Vercel 프록시 사용
 
 function extractNotionPageId(url: string): string | null {
   const match = url.match(/([a-f0-9]{32})/);
   return match ? match[1] : null;
 }
 
+async function fetchNotionData(notionPageId: string) {
+  try {
+    console.log(`🔍 Fetching Notion page from Proxy: ${notionPageId}`);
+
+    const response = await fetch(`${PROXY_URL}?pageId=${notionPageId}`);
+    if (!response.ok) {
+      throw new Error(
+        `Notion 프록시 API 요청 실패: ${response.status} ${response.statusText}`,
+      );
+    }
+    const data = await response.json();
+    console.log('✅ Notion 데이터 불러오기 성공:', data);
+    return data;
+  } catch (error) {
+    console.error('❌ Notion 데이터 불러오기 실패:', error);
+    return null;
+  }
+}
+
 function Plugin() {
   const [notionPageId, setNotionPageId] = useState<string | null>(null);
   const [notionRecordMap, setNotionRecordMap] = useState<any>(null);
-  const [notionAPI, setNotionAPI] = useState<any>(null);
+  const [isDarkMode, setIsDarkMode] = useState(false);
+
+  const [size, setSize] = useState({ width: 400, height: 1000 });
+  const [isResizing, setIsResizing] = useState(false);
+  const [resizeDirection, setResizeDirection] = useState<string | null>(null);
+  const [startX, setStartX] = useState(0);
+  const [startY, setStartY] = useState(0);
+  const [startWidth, setStartWidth] = useState(400);
+  const [startHeight, setStartHeight] = useState(1000);
 
   useEffect(() => {
-    // ✅ 동적으로 NotionAPI를 불러오기
-    import('notion-client')
-      .then(({ NotionAPI }) => {
-        setNotionAPI(new NotionAPI());
-      })
-      .catch((error) => {
-        console.error('NotionAPI 로드 실패:', error);
-      });
-  }, []);
+    function handleMouseMove(event: MouseEvent) {
+      if (!isResizing || !resizeDirection) return;
 
+      let newWidth = startWidth;
+      let newHeight = startHeight;
+
+      if (resizeDirection.includes('right')) {
+        newWidth = Math.max(
+          400,
+          Math.min(startWidth + (event.clientX - startX), 1000),
+        );
+      }
+      if (resizeDirection.includes('left')) {
+        const deltaX = startX - event.clientX;
+        newWidth = Math.max(400, Math.min(startWidth + deltaX, 1000));
+      }
+      if (resizeDirection.includes('bottom')) {
+        newHeight = Math.max(
+          400,
+          Math.min(startHeight + (event.clientY - startY), 1000),
+        );
+      }
+      if (resizeDirection.includes('top')) {
+        newHeight = Math.max(
+          400,
+          Math.min(startHeight - (event.clientY - startY), 1000),
+        );
+      }
+
+      setSize({ width: newWidth, height: newHeight });
+
+      // Figma에게 크기 조절 요청 (아이프레임 위치 변경 없이 크기만 조정)
+      parent.postMessage(
+        {
+          pluginMessage: {
+            type: 'RESIZE_WINDOW',
+            width: newWidth,
+            height: newHeight,
+          },
+        },
+        '*',
+      );
+    }
+
+    function handleMouseUp() {
+      setIsResizing(false);
+      setResizeDirection(null);
+    }
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isResizing, resizeDirection, startX, startY, startWidth, startHeight]);
   useEffect(() => {
     window.onmessage = async (event) => {
       const message = event.data.pluginMessage;
       if (message.type === 'SELECT_LAYER') {
         const layerName = message.layerName;
         console.log(`Selected layer: ${layerName}`);
-
         // Notion 페이지 URL에서 ID 추출
         const pageId = extractNotionPageId(layerName);
+        if (!pageId) {
+          console.log('유효한 Notion 페이지 ID를 찾을 수 없습니다.');
+          return;
+        }
+
         if (pageId) {
           setNotionPageId(pageId);
-        } else {
-          console.error('유효한 Notion 페이지 ID를 찾을 수 없습니다.');
         }
+        // else {
+        //   console.error('유효한 Notion 페이지 ID를 찾을 수 없습니다.');
+        // }
       }
     };
   }, []);
+  // (1) 시스템 다크 모드 감지
+  useEffect(() => {
+    if (window.matchMedia) {
+      const mql = window.matchMedia('(prefers-color-scheme: dark)');
+
+      // 초기 값 설정
+      setIsDarkMode(mql.matches);
+
+      // 변경 이벤트 등록
+      const handleChange = (e: MediaQueryListEvent) => {
+        setIsDarkMode(e.matches);
+      };
+      mql.addEventListener('change', handleChange);
+
+      return () => {
+        mql.removeEventListener('change', handleChange);
+      };
+    }
+  }, []);
+  useEffect(() => {
+    if (notionPageId) {
+      fetchNotionData(notionPageId)
+        .then((res) => {
+          console.log(res);
+          setNotionRecordMap(res);
+        })
+        .catch((error) => console.error('🚨 Notion API 최종 실패:', error));
+    }
+  }, [notionPageId]);
 
   useEffect(() => {
-    // NotionAPI가 로드되고 페이지 ID가 변경되면 데이터 가져오기
-    console.log(' notionAPI:', notionAPI);
-    console.log(' notionPageId:', notionPageId);
-    if (notionAPI && notionPageId) {
-      console.log(`🔍 Fetching Notion page: ${notionPageId}`);
-
-      notionAPI
-        .getPage(notionPageId)
-        .then((data: any) => {
-          console.log('✅ Notion 데이터 불러오기 성공:', data);
-          setNotionRecordMap(data);
-        })
-        .catch((error: Error) => {
-          console.error('❌ Notion 데이터 불러오기 실패:', error);
-        });
+    if (notionRecordMap) {
+      // 전체 창 기준으로 스크롤 위치를 맨 위로
+      window.scrollTo(0, 0);
     }
-  }, [notionAPI, notionPageId]);
+  }, [notionRecordMap]);
 
+  // recordMap이 준비되지 않았으면 로딩 메시지 혹은 안내 메시지 렌더링
+  if (!notionRecordMap) {
+    return (
+      <p
+        style={{
+          color: isDarkMode ? 'white' : 'black',
+          whiteSpace: 'pre-line',
+        }}
+      >
+        {`
+         Figma 요소를 선택하면 해당하는 Notion 페이지가 표시됩니다.
+
+         [작업자 전제조건]
+         - notion에서 규격서 작성 - 우측 상단 공유 버튼 - 게시 탭 - 게시 버튼 - 링크복사
+
+         - 원하는 피그마 디자인 접속 - 좌측 Layers 에 복사해둔 notion 링크를 할당
+   `}
+      </p>
+    );
+  }
   return (
-    <Container space='medium'>
-      <VerticalSpace space='small' />
-      <h2>Notion 페이지 미리보기</h2>
-      <VerticalSpace space='large' />
-      {notionRecordMap ? (
-        <NotionRenderer
-          recordMap={notionRecordMap}
-          fullPage={true}
-          darkMode={false}
-        />
-      ) : (
-        <p>Figma 요소를 선택하면 해당하는 Notion 페이지가 표시됩니다.</p>
-      )}
-    </Container>
+    <div
+      id='plugin-container'
+      style={{
+        // width: size.width,
+        // height: size.height,
+        // background: 'white',
+        position: 'relative',
+        // border: '1px solid #ccc',
+      }}
+    >
+      <NotionRenderer
+        recordMap={notionRecordMap}
+        darkMode={isDarkMode}
+        fullPage={true}
+      />{' '}
+      {/* 크기 조절 핸들 추가 */}
+      <div
+        className='resize-handle right'
+        onMouseDown={(e) => {
+          setIsResizing(true);
+          setResizeDirection('right');
+          setStartX(e.clientX);
+          setStartWidth(size.width);
+        }}
+        style={{ height: notionRecordMap ? '100vh' : '100vh' }}
+      />
+    </div>
   );
 }
 
-export default render(Plugin);
+const rootNode = document.getElementById('create-figma-plugin');
+if (rootNode) {
+  const root = ReactDOM.createRoot(rootNode);
+  root.render(<Plugin />);
+} else {
+  console.error('Root node not found!');
+}

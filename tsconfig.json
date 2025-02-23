@@ -1,12 +1,17 @@
 {
   "extends": "@create-figma-plugin/tsconfig",
   "compilerOptions": {
-    "paths": {
-      "react": ["./node_modules/preact/compat"],
-      "react-dom": ["./node_modules/preact/compat"]
-    },
+    // react alias 제거
+    //"paths": {
+    //  "react": ["./node_modules/preact/compat"],
+    //  "react-dom": ["./node_modules/preact/compat"]
+    //},
+    "jsxFactory": "React.createElement",
+    // "esModuleInterop": true,
+    // "lib": ["ES2015", "DOM"],
     "skipLibCheck": true,
-    "typeRoots": ["node_modules/@figma", "node_modules/@types"]
+    // "typeRoots": ["node_modules/@figma", "node_modules/@types"],
+    "jsx": "react"
   },
   "include": ["src/**/*.ts", "src/**/*.tsx"]
 }

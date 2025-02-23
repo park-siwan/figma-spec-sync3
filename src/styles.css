@@ -1,10 +1,42 @@
-.container {
-  overflow: auto;
-  height: 164px;
+/* 기본(라이트 모드) 설정 */
+:root {
+  --bg-color: white;
+  --text-color: black;
+  --header-color: white;
+}
+/* 다크 모드일 때(시스템 설정 기준) */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg-color: rgba(135, 131, 120, 0.15) !important;
+    --text-color: white;
+    --header-color: #2c2c2c;
+  }
+}
+.notion-app {
+  background: transparent !important;
+}
+.notion-header {
+  background: var(--header-color);
 }
 
-.editor {
-  min-height: 100%;
-  font-family: var(--font-family-code);
-  font-size: var(--font-size-12);
+.resize-handle {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  background: transparent;
+}
+
+.resize-handle:hover {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.resize-handle.right {
+  top: 50%;
+  right: 0;
+  width: 25px;
+  height: 100vh;
+  cursor: ew-resize;
+  transform: translateY(-50%);
+  position: fixed;
+  z-index: 999999;
 }

@@ -45,6 +45,7 @@ function Plugin() {
   const [startY, setStartY] = useState(0);
   const [startWidth, setStartWidth] = useState(400);
   const [startHeight, setStartHeight] = useState(1000);
+  const [blockId, setBlockId] = useState('');
 
   useEffect(() => {
     function handleMouseMove(event: MouseEvent) {
@@ -156,14 +157,75 @@ function Plugin() {
     }
   }, [notionPageId]);
 
+  // useEffect(() => {
+  //   if (notionRecordMap) {
+  //     // 전체 창 기준으로 스크롤 위치를 맨 위로
+  //     window.scrollTo(0, 0);
+  //   }
+  // }, [notionRecordMap]);
+
   useEffect(() => {
-    if (notionRecordMap) {
-      // 전체 창 기준으로 스크롤 위치를 맨 위로
-      window.scrollTo(0, 0);
-    }
+    window.onmessage = async (event) => {
+      const message = event.data.pluginMessage;
+      if (message.type === 'SELECT_LAYER') {
+        const layerName = message.layerName;
+        console.log(`📌 선택된 Layer: ${layerName}`);
+
+        // Notion 페이지 URL에서 페이지 ID 추출
+        const pageId = extractNotionPageId(layerName);
+        if (!pageId) {
+          console.log('❌ 유효한 Notion 페이지 ID를 찾을 수 없습니다.');
+          return;
+        }
+
+        setNotionPageId(pageId);
+
+        // 🔍 Notion 페이지 URL에서 블록 ID가 포함되어 있는지 확인
+        const match = layerName.match(/#([a-f0-9]{32})/);
+        const blockId = match ? match[1] : null;
+
+        // 스크롤 이동을 위한 블록 ID 저장
+        if (blockId) {
+          setBlockId(blockId);
+          console.log(`🔍 특정 블록 ID 감지됨: ${blockId}`);
+          // setTimeout(() => {
+          if (notionRecordMap) {
+            const targetBlock = document.getElementById(blockId);
+            if (targetBlock) {
+              console.log(`✅ 블록 찾음, 스크롤 이동: ${blockId}`);
+              targetBlock.scrollIntoView({
+                behavior: 'smooth',
+                block: 'start',
+              });
+            } else {
+              console.warn(`⚠️ 해당 블록을 찾을 수 없음: ${blockId}`);
+              console.log('⬆️ 블록이 없으므로 최상단으로 이동');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+          }
+          // }, 0); // NotionRenderer가 완전히 렌더링될 시간을 고려하여 1초 딜레이
+        } else {
+          console.log('⬆️ 블록 ID가 없으므로 최상단으로 이동');
+          // setTimeout(() => {
+          if (notionRecordMap) {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }
+          // }, 0);
+        }
+      }
+    };
   }, [notionRecordMap]);
 
-  // recordMap이 준비되지 않았으면 로딩 메시지 혹은 안내 메시지 렌더링
+  useEffect(() => {
+    console.log(`✅ 블록 찾음, 스크롤 이동: ${blockId}`);
+    const targetBlock = document.getElementById(blockId);
+    if (!targetBlock) return;
+    targetBlock.scrollIntoView({
+      behavior: 'smooth',
+      block: 'start',
+    });
+  }, [blockId, notionRecordMap]);
+
   if (!notionRecordMap) {
     return (
       <p
@@ -195,6 +257,7 @@ function Plugin() {
       }}
     >
       <NotionRenderer
+        rootPageId={notionPageId || undefined} // 페이지 ID가 있을 때만 설정
         recordMap={notionRecordMap}
         darkMode={isDarkMode}
         fullPage={true}

@@ -1,0 +1,31 @@
+{
+  "dependencies": {
+    "@create-figma-plugin/ui": "^3.2.1",
+    "@create-figma-plugin/utilities": "^3.2.1",
+    "notion-client": "^7.1.6",
+    "preact": ">=10",
+    "prismjs": "1.29.0",
+    "react-notion-x": "^7.2.6",
+    "react-simple-code-editor": "0.13.1"
+  },
+  "devDependencies": {
+    "@create-figma-plugin/build": "^3.2.1",
+    "@create-figma-plugin/tsconfig": "^3.2.1",
+    "@figma/plugin-typings": "1.100.2",
+    "@types/prismjs": "1.26.3",
+    "typescript": ">=4"
+  },
+  "scripts": {
+    "build": "build-figma-plugin --typecheck --minify",
+    "watch": "build-figma-plugin --typecheck --watch"
+  },
+  "figma-plugin": {
+    "editorType": [
+      "figma"
+    ],
+    "id": "figma-spec-sync-(react + notion)",
+    "name": "figma-spec-sync",
+    "main": "src/main.ts",
+    "ui": "src/ui.tsx"
+  }
+}

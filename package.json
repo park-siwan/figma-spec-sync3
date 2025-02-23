@@ -26,9 +26,15 @@
     "editorType": [
       "figma"
     ],
-    "id": "figma-spec-sync-(react + notion)",
+    "id": "1475589918809912840",
     "name": "figma-spec-sync",
     "main": "src/main.ts",
-    "ui": "src/ui.tsx"
+    "ui": "src/ui.tsx",
+    "networkAccess": {
+      "allowedDomains": [
+        "https://spec-sync-api.vercel.app"
+      ]
+    },
+    "documentAccess": "dynamic-page"
   }
 }
